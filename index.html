@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+    label{display: inline-block; width:80px}
+    input,select{width:300px; font-size: 20px;}
+    #Detallesbox{height: 100px;}
+    #AddOrderBtn {
+        background-color: #4CAF50;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    #AddOrderBtn:hover {
+        background-color: #3e8e41;
+    }
+    #OrdersTable {
+        font-family: Arial, Helvetica, sans-serif;
+        border-collapse: collapse;
+        width: 100%;
+    }
+    #OrdersTable td, #OrdersTable th {
+        border: 1px solid #ddd;
+        padding: 8px;
+    }
+    #OrdersTable tr:nth-child(even){background-color: #f2f2f2;}
+    #OrdersTable tr:hover {background-color: #ddd;}
+    #OrdersTable th {
+        padding-top: 12px;
+        padding-bottom: 12px;
+        text-align: left;
+        background-color: #4CAF50;
+        color: white;
+    }
+    </style>
+    <title>Pedidos</title>
+</head>
+<body>
+<label>Nombre</label> <input id="Nombrebox" type="text"> <br><br>
+<label>Detalles</label> <input id="Detallesbox" type="text"> <br><br>
+<label>Precio</label> <input id="Preciobox" type="text"> <br><br>
+
+<hr>
+<button id="AddOrderBtn">Agregar Orden</button>
+
+<table id="OrdersTable">
+  <tr>
+    <th>ID</th>
+    <th>Nombre</th>
+    <th>Detalles</th>
+    <th>Precio</th>
+    <th>Acciones</th>
+  </tr>
+</table>
+
+<script type="module">
+    // Import the functions you need from the SDKs you need
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+    // TODO: Add SDKs for Firebase products that you want to use
+    // https://firebase.google.com/docs/web/setup#available-libraries
+  
+    // Your web app's Firebase configuration
+    const firebaseConfig = {
+        apiKey: "AIzaSyBxhfbJPkecm4lvNYvtzQji2sD3guAR75Y",
+        authDomain: "listapedidos-bd5df.firebaseapp.com",
+        projectId: "listapedidos-bd5df",
+        storageBucket: "listapedidos-bd5df.appspot.com",
+        messagingSenderId: "66386641001",
+        appId: "1:66386641001:web:725af0e36fc18c621922f8"
+    };
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+
+    import {
+        getFirestore, doc, getDoc, setDoc, collection, addDoc, updateDoc, deleteDoc, getDocs, onSnapshot
+    } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+
+    const db = getFirestore();
+
+    let Nombrebox = document.getElementById("Nombrebox");
+    let Detallesbox = document.getElementById("Detallesbox");
+    let Preciobox = document.getElementById("Preciobox");
+
+    let AddOrderBtn = document.getElementById("AddOrderBtn");
+
+    async function AddOrder() {
+  try {
+    const ref = collection(db, "Orders");
+    const docRef = await addDoc(ref, {
+      nombre: Nombrebox.value,
+      detalles: Detallesbox.value,
+      precio: "$" + Preciobox.value
+    });
+    alert("Orden agregada exitosamente");
+    addOrderToTable(docRef.id, Nombrebox.value, Detallesbox.value, "$" + Preciobox.value);
+  } catch (error) {
+    alert("Hubo un problema, ERROR: " + error);
+  }
+}
+
+function addOrderToTable(id, nombre, detalles, precio) {
+  let OrdersTable = document.getElementById("OrdersTable");
+
+  if (OrdersTable) {
+    // Verificar si ya existe una fila con el ID de la orden
+    const existingRow = document.querySelector('[data-id="' + id + '"]');
+    if (existingRow) {
+      // Actualizar los valores de la fila existente en lugar de crear una nueva fila
+      const row = existingRow.parentNode.parentNode;
+      const nombreCell = row.querySelector('.nombre-cell');
+      const detallesCell = row.querySelector('.detalles-cell');
+      const precioCell = row.querySelector('.precio-cell');
+
+      if (nombreCell && detallesCell && precioCell) {
+        nombreCell.innerHTML = nombre;
+        detallesCell.innerHTML = detalles;
+        precioCell.innerHTML = precio;
+      }
+    } else {
+      // Crear una nueva fila
+      let row = OrdersTable.insertRow(-1);
+      row.setAttribute('data-id', id);
+
+      let idCell = row.insertCell(0);
+      let nombreCell = row.insertCell(1);
+      let detallesCell = row.insertCell(2);
+      let precioCell = row.insertCell(3);
+      let actionsCell = row.insertCell(4);
+
+      idCell.innerHTML = OrdersTable.rows.length - 1;
+      nombreCell.innerHTML = nombre;
+      detallesCell.innerHTML = detalles;
+      precioCell.innerHTML = precio;
+      actionsCell.innerHTML = '<button class="edit-btn" data-id="' + id + '">Editar</button> <button class="delete-btn" data-id="' + id + '">Eliminar</button>';
+
+      // Agregar event listeners para los botones de editar y eliminar
+      row.querySelector('.edit-btn').addEventListener('click', (e) => {
+        const id = e.target.getAttribute('data-id');
+        EditOrder(id);
+      });
+
+      row.querySelector('.delete-btn').addEventListener('click', (e) => {
+        const id = e.target.getAttribute('data-id');
+        DeleteOrder(id);
+      });
+    }
+  } else {
+    console.error("No se encontró el elemento 'OrdersTable'");
+  }
+}
+
+
+
+    AddOrderBtn.addEventListener("click", AddOrder);
+
+    async function DisplayOrders() {
+        const query = collection(db, "Orders");
+        const unsubscribe = onSnapshot(query, (querySnapshot) => {
+            // Clear the table except for the header row
+            let OrdersTable = document.getElementById("OrdersTable");
+            for (let i = OrdersTable.rows.length - 1; i > 0; i--) {
+                OrdersTable.deleteRow(i);
+            }
+
+            // Populate the table with the new data
+            querySnapshot.forEach((doc) => {
+                addOrderToTable(doc.id, doc.data().nombre, doc.data().detalles, doc.data().precio);
+            });
+        });
+    }
+
+    // Call DisplayOrders function once at the beginning
+    DisplayOrders();
+
+    async function EditOrder(id) {
+        let password = prompt("Ingrese la contraseña:");
+        if (password == "zetta1") {
+            const orderRef = doc(db, "Orders", id);
+            const orderDoc = await getDoc(orderRef);
+            if (orderDoc.exists()) {
+                const currentData = orderDoc.data();
+                const updatedOrder = {
+                    nombre: prompt("Editar Nombre:", currentData.nombre),
+                    detalles: prompt("Editar Detalles:", currentData.detalles),
+                    precio: "$" + prompt("Editar Precio:", currentData.precio.slice(1))
+                };
+                await updateDoc(orderRef, updatedOrder);
+                alert("Orden actualizada exitosamente");
+            } else {
+                alert("La orden no existe");
+            }
+        } else {
+            alert("Contraseña incorrecta");
+        }
+    }
+
+    async function DeleteOrder(id) {
+        let password = prompt("Ingrese la contraseña:");
+        if (password == "zetta1") {
+            const orderRef = doc(db, "Orders", id);
+            await deleteDoc(orderRef);
+            alert("Orden eliminada exitosamente");
+        } else {
+            alert("Contraseña incorrecta");
+        }
+    }
+</script>
+</body>
+</html>
